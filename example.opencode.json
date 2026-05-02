@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "opsx-deepseek": {
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "description": "OpenSpec reviewer — DeepSeek",
+      "hidden": true
+    },
+    "opsx-kimi": {
+      "mode": "subagent",
+      "model": "kimi-for-coding/k2p6",
+      "description": "OpenSpec reviewer — Kimi",
+      "hidden": true
+    },
+    "opsx-glm": {
+      "mode": "subagent",
+      "model": "zai-coding-plan/glm-5.1",
+      "description": "OpenSpec reviewer — GLM",
+      "hidden": true
+    }
+  }
+}

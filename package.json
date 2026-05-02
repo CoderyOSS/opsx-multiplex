@@ -1,0 +1,20 @@
+{
+  "name": "opsx-multiplex",
+  "version": "1.0.0",
+  "description": "Multi-model consensus tools — deliberation and task arrangement for large projects",
+  "license": "MIT",
+  "bin": {
+    "opsx-multiplex": "bin/install.js"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "commands"
+  ],
+  "keywords": [
+    "openspec",
+    "multi-agent",
+    "deliberation",
+    "opencode"
+  ]
+}
