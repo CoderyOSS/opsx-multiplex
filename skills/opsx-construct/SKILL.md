@@ -78,13 +78,63 @@ Parse input flags:
 - `--halt`: Set status to "halted", shutdown all teammates, write halt_context, stop
 - `--layer N`: Resume at specific layer
 - `--max-parallel N`: Override max_parallel
+- `help` / `-h` / `--help`: Print help and STOP
+- `reset`: Delete state file (with confirmation) and STOP
+
+**Help**: If `help`, `-h`, or `--help`:
+
+Print the following and STOP:
+
+```
+opsx-construct — Parallel build + deliberate review protocol
+
+Usage:
+  /opsx-construct                          Fresh start
+  /opsx-construct --resume                 Resume from paused/halted/aborted
+  /opsx-construct --resume --layer N       Resume at specific layer
+  /opsx-construct --max-parallel N         Override max parallel tasks
+  /opsx-construct --pause                  Soft pause: current jobs finish, no new spawns
+  /opsx-construct --halt                   Hard halt: stop all, save granular state
+  /opsx-construct reset                    Remove state file (destructive, confirms first)
+  /opsx-construct help | -h | --help       Show this help
+
+Workflow:
+  Phase 0: Setup — configure, baseline tests
+  Phase 1: Architecture deliberation → human gate
+  Phase 2: Parallel implementation (ensemble teammates)
+  Phase 3: Per-feature code review → fix cycles
+  Phase 3.5: Shutdown teammates
+  Phase 4: Smart merge (clean first, conflicting pairwise)
+  Phase 5: Post-merge cross-feature review
+  Phase 6: Full regression pass
+  Phase 7: Finalize → human gate → merge to main
+
+Requirements:
+  - OpenSpec project with specs, tasks.md, E2E tests
+  - opencode-ensemble plugin installed
+  - opsx-* subagents configured in opencode.json
+```
+
+**Reset**: If `reset`:
+
+1. Check if `.openspec/tmp/construct-state.json` exists.
+2. If not: "No state file found. Nothing to reset." STOP.
+3. If yes: present confirmation via `question` tool:
+
+> "This will permanently delete `.openspec/tmp/construct-state.json` and all associated
+> architecture directive files in `.openspec/tmp/`. This is **destructive** — you will
+> lose all progress tracking for the current build. Any running ensemble teammates will
+> NOT be stopped (use `--halt` first if needed). Proceed?"
+
+- User confirms: `rm -f .openspec/tmp/construct-state.json .openspec/tmp/arch-guidance-L*.md .openspec/tmp/construct-report-L*.md`. "State reset. Ready for fresh start."
+- User cancels: "Reset cancelled." STOP.
 
 If `--resume`: jump to RESUME LOGIC (section below).
 
 If `--pause` or `--halt`: jump to PAUSE/HALT LOGIC (section below).
 
 If neither flag: check if `.openspec/tmp/construct-state.json` already exists.
-If it does: tell user "State file exists. Use `--resume` to continue or delete the file to start fresh." STOP.
+If it does: tell user "State file exists. Use `--resume` to continue or `reset` to delete it." STOP.
 
 ### 0.2 Verify prerequisites
 
@@ -136,19 +186,35 @@ Load project config if it exists:
 cat .opencode/construct.json 2>/dev/null
 ```
 
-If found, read `max_parallel`, `max_review_rounds`, `max_impl_attempts` as baseline values.
+If found, read any overrides as baseline values.
 
 Priority chain for each setting (highest wins):
 1. CLI flag (e.g., `--max-parallel 2`)
 2. State file `config.*` (on resume)
 3. Project config `.opencode/construct.json`
-4. Default (max_parallel=3, max_review_rounds=3, max_impl_attempts=5)
+4. Default
 
-Present resolved configuration via `question` tool:
+Ask each configuration question separately via `question` tool:
 
-> "Max parallel tasks: **{N}**. Max review rounds per cycle: **{N}**. Max implementation attempts: **{N}**. Change any value or accept defaults."
+**Question 1 — Max architecture deliberation cycles:**
 
-STOP and wait for user response. Apply overrides.
+> "Max architecture deliberation cycles: **6** (default).
+> Each cycle = all architecture reviewers review once. More cycles = deeper consensus
+> on architectural directives but takes longer. Change or accept."
+
+**Question 2 — Max implementation attempts:**
+
+> "Max implementation attempts per task: **10** (default).
+> How many times a teammate may retry passing its relevant E2E tests. Complex features
+> or unfamiliar codebases may need many attempts. Change or accept."
+
+**Question 3 — Max code review cycles:**
+
+> "Max code review cycles per feature: **6** (default).
+> Each cycle = all reviewers review once. Covers Phase 3 (per-feature) and Phase 5
+> (post-merge) review rounds. Change or accept."
+
+STOP and wait for user response after each question. Apply overrides.
 
 ### 0.6 Run baseline tests
 
@@ -176,8 +242,9 @@ Write `.openspec/tmp/construct-state.json`:
   "project": "<from openspec config>",
   "config": {
     "max_parallel": <N>,
-    "max_review_rounds": <N>,
-    "max_impl_attempts": 5,
+    "max_arch_cycles": <N>,
+    "max_impl_attempts": <N>,
+    "max_review_cycles": <N>,
     "reviewers": [<list of selected agent names>],
     "arch_reviewers": null,
     "ensemble_team": null
@@ -268,18 +335,22 @@ The subagent returns JSON:
 
 ### 1.4 Consensus cycle (re-entrant)
 
-For subsequent reviewers, dispatch with:
+**If `config.arch_reviewers.length === 1`**: skip this step. No consensus needed with
+a single reviewer. Go directly to S1.5.
+
+For 2+ reviewers, dispatch subsequent reviewers with:
 - Same materials + current directives JSON
 - Ask: agree/disagree with each directive, add new directives
 - Same consensus detection as opsx-deliberate: last N rounds with zero disagreements
   AND zero new directives = consensus
-- Max rounds: `config.max_review_rounds * reviewers.length`
+- Max cycles: `config.max_arch_cycles` (each cycle = all arch reviewers review once)
+- Track cycles, not individual dispatches (1 cycle = 1 complete pass of all arch reviewers)
 
 Update state file after each dispatch.
 
 ### 1.5 HARD GATE — Present to human
 
-Once consensus reached (or max rounds):
+Once consensus reached (or max cycles, or single reviewer done):
 
 Present directives to user via `question` tool:
 
@@ -378,7 +449,7 @@ Go to STATE 3.
 
 ### 3.1 Select next branch
 
-Find first WQ item with `status = "reviewing"` and `review_rounds < max_review_rounds * reviewers.length`.
+Find first WQ item with `status = "reviewing"` that has not reached `max_review_cycles` complete review cycles.
 
 If none: go to STATE 3.5 (shutdown).
 
@@ -425,7 +496,8 @@ After sending feedback via team_message:
 
 Same pattern as opsx-deliberate:
 - Last N rounds (N = reviewers.length) with zero disagreements = consensus
-- Max review rounds reached = forced pass
+- Max review cycles (`config.max_review_cycles`) reached = forced pass
+- Track cycles, not individual dispatches (1 cycle = 1 complete pass of all reviewers)
 
 When consensus: set WQ item `status = "approved"`.
 

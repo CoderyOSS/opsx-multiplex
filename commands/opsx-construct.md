@@ -21,6 +21,8 @@ via opsx-arrange), and E2E tests.
 /opsx-construct --resume --max-parallel 1 # Resume with reduced parallelism
 /opsx-construct --pause                  # Soft pause: let current jobs finish, no new spawns
 /opsx-construct --halt                   # Hard halt: stop everything, save granular state notes
+/opsx-construct reset                    # Remove state file (destructive, confirms first)
+/opsx-construct help | -h | --help       # Show help and all available flags
 ```
 
 **Steps**

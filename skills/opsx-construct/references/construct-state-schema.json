@@ -19,22 +19,30 @@
     },
     "config": {
       "type": "object",
-      "required": ["max_parallel", "max_review_rounds", "max_impl_attempts", "reviewers"],
+      "required": ["max_parallel", "max_arch_cycles", "max_impl_attempts", "max_review_cycles", "reviewers"],
       "properties": {
         "max_parallel": {
           "type": "integer",
           "minimum": 1,
           "default": 3
         },
-        "max_review_rounds": {
+        "max_arch_cycles": {
           "type": "integer",
           "minimum": 1,
-          "default": 3
+          "default": 6,
+          "description": "Max architecture deliberation cycles. Each cycle = all arch reviewers review once."
         },
         "max_impl_attempts": {
           "type": "integer",
           "minimum": 1,
-          "default": 5
+          "default": 10,
+          "description": "Max times a teammate may retry passing its E2E tests."
+        },
+        "max_review_cycles": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 6,
+          "description": "Max code review cycles per feature. Each cycle = all reviewers review once."
         },
         "reviewers": {
           "type": "array",

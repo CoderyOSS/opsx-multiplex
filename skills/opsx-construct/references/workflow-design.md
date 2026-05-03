@@ -112,7 +112,7 @@ After each reviewer's turn:
 1. Collect disagreements count + new proposals count
 2. Examine last N rounds (N = number of reviewers)
 3. If all N rounds have zero disagreements AND zero new proposals: consensus
-4. Max review rounds (default: 3 * reviewers.length) → forced halt
+4. Max review cycles (default: 6 for arch, 6 for code) → forced halt
 
 ## Human Gates
 
