@@ -41,6 +41,11 @@
           "items": { "type": "string" },
           "minItems": 1
         },
+        "arch_reviewers": {
+          "type": ["array", "null"],
+          "items": { "type": "string" },
+          "description": "Subset of reviewers selected by human for architecture deliberation. Set in S1.2a."
+        },
         "ensemble_team": {
           "type": ["string", "null"]
         }

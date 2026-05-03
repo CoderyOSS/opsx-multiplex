@@ -96,6 +96,22 @@ Check that the project has:
 
 If any missing: tell user what's missing. STOP.
 
+### 0.2a Verify dependencies
+
+Check that opencode-ensemble is available by attempting a dry-call:
+
+```bash
+# The team tools are ensemble plugin tools. If opencode recognizes them, ensemble is loaded.
+# We verify by checking if the team_create tool exists in the current session's tool list.
+```
+
+In practice: attempt `team_status` or check if the `opencode-ensemble` plugin is listed
+in the project's `opencode.json` or `.opencode/config.json` plugins array.
+
+If opencode-ensemble is not available: tell user "opencode-ensemble plugin required for
+parallel implementation. Install @hueyexe/opencode-ensemble before running opsx-construct."
+STOP.
+
 ### 0.3 Detect subagents
 
 Read the project's `opencode.json`. Find agents with names starting `opsx-` and
@@ -163,6 +179,7 @@ Write `.openspec/tmp/construct-state.json`:
     "max_review_rounds": <N>,
     "max_impl_attempts": 5,
     "reviewers": [<list of selected agent names>],
+    "arch_reviewers": null,
     "ensemble_team": null
   },
   "progress": {
@@ -212,12 +229,23 @@ Read:
 - Prior layers' architecture directives (from `arch_directives` in state)
 - `tasks.md` for this layer
 
+### 1.2a Select architecture reviewers
+
+Present the reviewers chosen in S0.4 to the human via `question` tool:
+
+> "Which reviewers should participate in architecture deliberation for this layer?"
+
+Show all `config.reviewers` as checkboxes. Default: all selected.
+STOP and wait for user response.
+
+Save selected architecture reviewers to state file as `config.arch_reviewers`.
+
 ### 1.3 Dispatch first architecture reviewer
 
 Read `references/architecture-prompt.md`. Append all materials.
 
 Call `task` with:
-- `subagent_type`: first reviewer from config
+- `subagent_type`: first agent from `config.arch_reviewers`
 - `prompt`: architecture prompt + materials
 - `description`: `"opsx-construct arch L{N}: {agent-name}"`
 
