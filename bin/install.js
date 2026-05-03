@@ -7,6 +7,7 @@ const { parseArgs } = require("node:util");
 const SKILLS = [
   { name: "opsx-deliberate", command: "opsx-deliberate.md", meta: "opsx-deliberate.json" },
   { name: "opsx-arrange", command: "opsx-arrange.md" },
+  { name: "opsx-construct", command: "opsx-construct.md" },
 ];
 
 const TOOL_SKILL_DIRS = {
