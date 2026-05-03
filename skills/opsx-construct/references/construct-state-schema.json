@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpsxConstructState",
+  "description": "State file for opsx-construct parallel build + review protocol",
+  "type": "object",
+  "required": ["version", "status", "project", "config", "progress", "arch_directives", "work_queue", "completed", "human_issues", "error_log", "regression_history"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "paused", "halted", "aborted", "complete"]
+    },
+    "project": {
+      "type": "string",
+      "description": "Project name from openspec config"
+    },
+    "config": {
+      "type": "object",
+      "required": ["max_parallel", "max_review_rounds", "max_impl_attempts", "reviewers"],
+      "properties": {
+        "max_parallel": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "max_review_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "max_impl_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "ensemble_team": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "progress": {
+      "type": "object",
+      "required": ["current_layer", "total_layers", "current_phase", "current_state", "last_phase_completed"],
+      "properties": {
+        "current_layer": { "type": "integer", "minimum": 0 },
+        "total_layers": { "type": "integer", "minimum": 1 },
+        "current_phase": {
+          "type": "string",
+          "enum": ["setup", "architecture", "implementing", "reviewing", "shutdown", "merging", "post_review", "regression", "finalizing"]
+        },
+        "current_state": { "type": "string" },
+        "last_phase_completed": { "type": "integer", "minimum": -1 }
+      }
+    },
+    "arch_directives": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Layer number → file path of approved directives"
+    },
+    "work_queue": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "task_id", "spec", "test_files", "phase", "state", "status", "attempts", "review_rounds", "updated_at"],
+        "properties": {
+          "id": { "type": "string" },
+          "task_id": { "type": "string" },
+          "spec": { "type": "string" },
+          "test_files": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "phase": {
+            "type": "string",
+            "enum": ["implementing", "reviewing", "approved", "merged"]
+          },
+          "state": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "queued", "in_progress", "crashed", "reviewing", "approved", "merged", "halted"]
+          },
+          "branch": { "type": ["string", "null"] },
+          "teammate": { "type": ["string", "null"] },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "review_rounds": { "type": "integer", "minimum": 0 },
+          "test_results": {
+            "type": ["object", "null"],
+            "properties": {
+              "pass": { "type": "integer" },
+              "fail": { "type": "integer" }
+            }
+          },
+          "error": { "type": ["string", "null"] },
+          "state_note": { "type": ["string", "null"] },
+          "halt_context": {
+            "type": ["object", "null"],
+            "properties": {
+              "completed_steps": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "next_step": { "type": "string" },
+              "branch_state": { "type": "string" },
+              "artifacts_preserved": { "type": "boolean" }
+            }
+          },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "completed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "task_id": { "type": "string" },
+          "spec": { "type": "string" },
+          "test_files": { "type": "array", "items": { "type": "string" } },
+          "phase": { "type": "string" },
+          "state": { "type": "string" },
+          "status": { "type": "string", "enum": ["merged_to_main"] },
+          "branch": { "type": ["string", "null"] },
+          "attempts": { "type": "integer" },
+          "review_rounds": { "type": "integer" },
+          "test_results": {
+            "type": ["object", "null"],
+            "properties": {
+              "pass": { "type": "integer" },
+              "fail": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "human_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "feature", "description", "status", "raised_at"],
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string", "enum": ["review", "regression"] },
+          "feature": { "type": "string" },
+          "work_queue_id": { "type": ["string", "null"] },
+          "description": { "type": "string" },
+          "test_file": { "type": ["string", "null"] },
+          "status": { "type": "string", "enum": ["open", "resolved", "wontfix"] },
+          "raised_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "error_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["timestamp", "phase", "error"],
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time" },
+          "work_queue_id": { "type": ["string", "null"] },
+          "phase": { "type": "string" },
+          "error": { "type": "string" },
+          "recovery": { "type": "string" }
+        }
+      }
+    },
+    "regression_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["layer", "run_at", "total_tests", "with_impl", "passed", "failed"],
+        "properties": {
+          "layer": { "type": "integer" },
+          "run_at": { "type": "string", "format": "date-time" },
+          "total_tests": { "type": "integer" },
+          "with_impl": { "type": "integer" },
+          "passed": { "type": "integer" },
+          "failed": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
