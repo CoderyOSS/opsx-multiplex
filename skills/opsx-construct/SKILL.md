@@ -142,7 +142,7 @@ Check that the project has:
 - `openspec/changes/` directory with at least one change
 - `tasks.md` with dependency-layered task list
 - E2E tests in `test/e2e/` or equivalent
-- `opencode.json` with at least one `opsx-*` subagent
+- `opencode.json` (project or global `~/.config/opencode/config.json`) with at least one `opsx-*` subagent
 
 If any missing: tell user what's missing. STOP.
 
@@ -156,7 +156,9 @@ Check that opencode-ensemble is available by attempting a dry-call:
 ```
 
 In practice: attempt `team_status` or check if the `opencode-ensemble` plugin is listed
-in the project's `opencode.json` or `.opencode/config.json` plugins array.
+in the project's `opencode.json`, `.opencode/config.json`, or global
+`~/.config/opencode/config.json`. Check all three, merging agents from each source —
+project-level takes precedence on name conflicts.
 
 If opencode-ensemble is not available: tell user "opencode-ensemble plugin required for
 parallel implementation. Install @hueyexe/opencode-ensemble before running opsx-construct."
@@ -164,10 +166,12 @@ STOP.
 
 ### 0.3 Detect subagents
 
-Read the project's `opencode.json`. Find agents with names starting `opsx-` and
-`"mode": "subagent"`.
+Read the project's `opencode.json` (or `.opencode/config.json`), then fall back to
+`~/.config/opencode/config.json` (global config). Merge agents from both sources —
+project-level takes precedence on name conflicts. Find agents with names starting `opsx-`
+and `"mode": "subagent"`.
 
-If zero found: tell user "No opsx-* subagents configured." STOP.
+If zero found: tell user "No opsx-* subagents found in project or global config. Add agents with the opsx- prefix to `opencode.json` or `~/.config/opencode/config.json`." STOP.
 
 ### 0.4 Select reviewers
 
@@ -354,13 +358,27 @@ Update state file after each dispatch.
 
 Once consensus reached (or max cycles, or single reviewer done):
 
-Present directives to user via `question` tool:
+Output directives directly to the user as formatted text (NOT via question tool —
+question renders plaintext, not markdown):
 
-> "## Architecture Directives — Layer {N}
->
-> {formatted list of directives}
->
-> **Approve** to proceed with implementation. **Amend** to modify directives. **Abort** to stop."
+```
+## Architecture Directives — Layer {N}
+
+**D1: {title}**
+{directive} — {rationale}
+
+**D2: {title}**
+{directive} — {rationale}
+
+(... repeat for each directive)
+```
+
+Each directive MUST include the `directive` and `rationale` fields from the JSON output.
+Do NOT summarize into a single sentence. Do NOT omit rationale.
+
+Then present the approval gate via `question` tool:
+- question: "Approve, amend, or abort these Layer {N} directives?"
+- options: [{"label": "Approve", "description": "Proceed with parallel implementation"}, {"label": "Amend", "description": "Modify directives before proceeding"}, {"label": "Abort", "description": "Stop the workflow"}]
 
 STOP and wait for user response.
 
@@ -683,20 +701,24 @@ Compile layer summary:
 - Human issues flagged
 - Commits on consolidated branch
 
-Present via `question` tool:
+Output the layer summary directly to the user as formatted text (NOT via question tool):
 
-> "## Layer {N} Summary
->
-> **Features**: X built, Y approved
-> **Tests**: Z passing
-> **Human issues**: W flagged
-> **Commits**: C on construct-L{N}
->
-> {detailed feature list with test results}
->
-> {human issues list}
->
-> **Approve** to merge to main. **Amend** to rework. **Abort** to stop."
+```
+## Layer {N} Summary
+
+**Features**: X built, Y approved
+**Tests**: Z passing
+**Human issues**: W flagged
+**Commits**: C on construct-L{N}
+
+{detailed feature list with test results}
+
+{human issues list}
+```
+
+Then present the approval gate via `question` tool:
+- question: "Approve, amend, or abort Layer {N}?"
+- options: [{"label": "Approve", "description": "Merge to main and proceed"}, {"label": "Amend", "description": "Rework before merging"}, {"label": "Abort", "description": "Stop the workflow"}]
 
 STOP and wait for user response.
 

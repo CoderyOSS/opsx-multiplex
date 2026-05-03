@@ -88,10 +88,12 @@ If missing, tell the user: "Run `/opsx-propose` first to create artifacts." STOP
 
 ### 0.3 Detect subagents
 
-Read the project's `opencode.json` (or `.opencode/config.json`). Look for agents
-in the `agent` field whose names start with `opsx-` and have `"mode": "subagent"`.
+Read the project's `opencode.json` (or `.opencode/config.json`), then fall back to
+`~/.config/opencode/config.json` (global config). Merge agents from both sources —
+project-level takes precedence on name conflicts. Look for agents in the `agent` field
+whose names start with `opsx-` and have `"mode": "subagent"`.
 
-If zero `opsx-*` subagents found: tell the user "No opsx-* subagents configured in opencode.json. Add at least one agent with the opsx- prefix." STOP.
+If zero `opsx-*` subagents found: tell the user "No opsx-* subagents found in project or global config. Add agents with the opsx- prefix to `opencode.json` or `~/.config/opencode/config.json`." STOP.
 
 ### 0.4 Select subagents
 
