@@ -3,7 +3,7 @@ description: Deliberate on an OpenSpec change proposal - sequential multi-agent 
 ---
 
 Deliberate on an OpenSpec change proposal — sequential round-robin review where agents
-build on each other's proposals until consensus or max turns. User accepts/modifies/rejects.
+build on each other's proposals until consensus or max cycles. User accepts/modifies/rejects.
 
 **Prerequisite**: Change must have artifacts created (run `/opsx-propose` first).
 
@@ -37,12 +37,12 @@ build on each other's proposals until consensus or max turns. User accepts/modif
    Steps 1-2 above handle STATE 0 (setup). The skill will continue from STATE 1:
 
    - STATE 0: Setup — detect change, verify artifacts, find `opsx-*` subagents,
-     user selects agents, set max turns (default: 3 × agent count), initialize state file
+      user selects agents, set max cycles (default: 3), initialize state file
    - STATE 1: Initial review — first agent reads artifacts, produces structured proposals,
      writes to state file
-   - STATE 2: Consensus cycle — next agent reviews artifacts + current proposals, agrees
-     or disagrees (with counter-proposals), may add new proposals. Turn counter increments.
-     Cycle continues until all agents agree in a full cycle OR max turns hit
+    - STATE 2: Consensus cycle — next agent reviews artifacts + current proposals, agrees
+      or disagrees (with counter-proposals), may add new proposals. Dispatch counter increments.
+      Cycle continues until all agents agree in a full cycle OR max cycles hit
    - STATE 3: Present results to user — formatted summary of agreed/disputed proposals,
      user accepts, modifies, or rejects
    - STATE 4: Apply — apply approved proposals to artifact files, commit, cleanup
@@ -69,10 +69,10 @@ build on each other's proposals until consensus or max turns. User accepts/modif
    - All analysis happens inside subagent dispatches
    - Agents run sequentially (not in parallel) — each sees the previous agent's results
    - Consensus = one full cycle where every agent had zero disagreements and zero new proposals
-   - Max turns (default 3 × agents) halts the process if consensus isn't reached
+    - Max cycles (default 3) halts the process if consensus isn't reached
    - **STOP** at STATE 3 after presenting results and wait for user's response
    - Do NOT proceed to apply changes until the user explicitly accepts or modifies
-   - Single commit after user acceptance (not per-turn)
+    - Single commit after user acceptance (not per-dispatch)
 
 **Guardrails**
 
