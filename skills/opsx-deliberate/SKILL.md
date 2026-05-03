@@ -3,7 +3,7 @@ name: opsx-deliberate
 description: >
   Sequential multi-agent deliberation on an OpenSpec change proposal.
   Agents review proposals in round-robin, agreeing or disagreeing until consensus
-  or max turns. User accepts/modifies/rejects final proposals.
+  or max cycles. User accepts/modifies/rejects final proposals.
 ---
 
 # OpenSpec Proposal Deliberation
@@ -15,7 +15,7 @@ Sequential, round-robin multi-agent deliberation on OpenSpec change proposals.
 This skill guides the agent through a structured deliberation workflow. The primary
 agent acts as orchestrator — it does NOT analyze artifacts itself. It dispatches
 subagents sequentially, each reviewing the previous agent's proposals, until all
-agents agree or max turns are exceeded.
+agents agree or max cycles are exceeded.
 
 **Input**: Optionally specify a change name. If omitted, auto-detected from `openspec list --json`.
 
@@ -60,7 +60,7 @@ The primary agent is the orchestrator. It does NOT analyze artifacts. It:
 - Dispatches subagents via `task` tool
 - Collects results and updates state file
 - Checks consensus logic
-- Controls turn counter
+- Controls cycle/dispatch counters
 - Presents results to user
 
 All analysis and review happens inside subagent dispatches.
@@ -104,12 +104,12 @@ STOP and wait for the user's response.
 
 If the user deselects all: tell the user "At least one agent must be selected." STOP.
 
-### 0.5 Set max turns
+### 0.5 Set max cycles
 
-Calculate default: `max_turns = 3 * selected_agents.length`
+Calculate default: `max_cycles = 3`
 
 Present to user:
-> "Max turns: **N** (3 × M agents). Change this value or press enter to accept."
+> "Max review cycles: **3**. Each cycle = all reviewers review once. Change this value or press enter to accept."
 
 STOP and wait for the user's response. If user provides a number, use it. If blank,
 use default.
@@ -127,8 +127,9 @@ Write `.openspec/tmp/deliberate-state.json`:
 ```json
 {
   "change": "<change-name>",
-  "max_turns": <N>,
-  "turn": 0,
+  "max_cycles": 3,
+  "current_cycle": 0,
+  "dispatches_in_cycle": 0,
   "agents": [<list of selected agent names>],
   "agent_index": 0,
   "consensus_reached": false,
@@ -143,7 +144,7 @@ Write `.openspec/tmp/deliberate-state.json`:
 - Change name identified
 - Artifacts verified to exist
 - Agents selected
-- Max turns set
+- Max cycles set
 - State file initialized
 
 **GATE**: Artifacts exist. At least one agent selected. State file written.
@@ -207,7 +208,7 @@ If the subagent fails or returns invalid JSON:
 If successful:
 - Add each proposal to `current_proposals` in the state file
 - Set each proposal's `proposed_by` to the agent name
-- Set each proposal's `proposed_at_turn` to 1
+- Set each proposal's `proposed_at_cycle` to 1
 - Set each proposal's `status` to "proposed"
 - Set each proposal's `agreements` to `[]`
 - Set each proposal's `disagreements` to `[]`
@@ -215,11 +216,12 @@ If successful:
 Update state file:
 ```json
 {
-  "turn": 1,
+  "current_cycle": 1,
+  "dispatches_in_cycle": 1,
   "agent_index": 1,
   "rounds": [
     {
-      "turn": 1,
+      "cycle": 1,
       "agent": "<agent-name>",
       "disagreements": 0,
       "new_proposals": <count>
@@ -236,14 +238,14 @@ If zero proposals found:
 
 Otherwise:
 > **Initial review complete**: Agent <name> found N proposals. Beginning consensus cycle.
-> Turn 1 of M max. Next agent: <next-agent-name>.
+> Cycle 1 of M max. Next agent: <next-agent-name>.
 
 ### STATE 1 OUTPUT
 
 - All artifacts read
 - First agent dispatched and result collected
 - State file updated with proposals
-- Turn set to 1
+- Cycle/dispatch set to 1
 - Summary output to user
 
 **GATE**: State file updated. At least one proposal recorded (or confirmed zero).
@@ -257,10 +259,10 @@ This state is re-entrant. Each invocation dispatches one agent and checks consen
 ### 2.1 Check prerequisites
 
 Read `.openspec/tmp/deliberate-state.json`. Verify:
-- `turn` < `max_turns`
+- `current_cycle` < `max_cycles`
 - `consensus_reached` is false
 
-If `turn >= max_turns`: Skip to STATE 3 (forced halt).
+If `current_cycle >= max_cycles`: Skip to STATE 3 (forced halt).
 If `consensus_reached` is true: Skip to STATE 3.
 
 ### 2.2 Determine next agent
@@ -285,7 +287,7 @@ Construct the prompt with:
 Call `task` with:
 - `subagent_type`: the agent name
 - `prompt`: the combined review prompt + artifacts + proposals
-- `description`: `"opsx-deliberate turn <N>: <agent-name>"`
+- `description`: `"opsx-deliberate cycle <N>: <agent-name>"`
 
 The subagent must return a JSON object:
 ```json
@@ -329,7 +331,7 @@ Collect the JSON from the subagent.
 
 If the subagent fails or returns invalid JSON:
 - Log the failure
-- Increment turn anyway (counts as a turn)
+- Increment dispatch counter anyway (counts as a dispatch)
 - Continue to next agent
 
 If successful, update the state file:
@@ -343,12 +345,12 @@ If successful, update the state file:
 - Set the proposal's `status` to "disputed"
 - Add to the proposal's `disagreements` array:
   ```json
-  { "agent": "<agent-name>", "turn": <turn>, "reason": "...", "counter_id": "P2a" }
+  { "agent": "<agent-name>", "cycle": <current_cycle>, "reason": "...", "counter_id": "P2a" }
   ```
 - Add the counter_proposal to `current_proposals`:
   - Set `status` to "counter"
   - Set `proposed_by` to the agent name
-  - Set `proposed_at_turn` to the current turn
+  - Set `proposed_at_cycle` to the current cycle
   - Set `agreements` to `[]`
   - Set `disagreements` to `[]`
 
@@ -357,23 +359,27 @@ If successful, update the state file:
 - Add to `current_proposals`:
   - Set `status` to "proposed"
   - Set `proposed_by` to the agent name
-  - Set `proposed_at_turn` to the current turn
+  - Set `proposed_at_cycle` to the current cycle
   - Set `agreements` to `[]`
   - Set `disagreements` to `[]`
 
 Update state file metadata:
 ```json
 {
-  "turn": <turn + 1>,
+  "dispatches_in_cycle": <dispatches_in_cycle + 1>,
   "agent_index": <agent_index + 1>,
   "rounds": [...existing rounds..., {
-    "turn": <current turn>,
+    "cycle": <current_cycle>,
     "agent": "<agent-name>",
     "disagreements": <count of disagreements>,
     "new_proposals": <count of new proposals>
   }]
 }
 ```
+
+If `dispatches_in_cycle >= agents.length`:
+- Increment `current_cycle` by 1
+- Reset `dispatches_in_cycle` to 0
 
 ### 2.6 Check consensus
 
@@ -385,16 +391,16 @@ Examine the last N rounds in the `rounds` array (N = number of agents):
    - Go to STATE 3
 3. Otherwise: consensus not reached. Continue.
 
-### 2.7 Check max turns
+### 2.7 Check max cycles
 
-If `turn >= max_turns`:
+If `current_cycle >= max_cycles`:
 - Do NOT dispatch another agent
 - Go to STATE 3 (forced halt)
 
 ### 2.8 Continue cycle
 
 Report progress to user:
-> **Turn N of M**: Agent <name> reviewed — X agreements, Y disagreements, Z new proposals. Next: <next-agent>.
+> **Cycle N of M** (dispatch X/Y in cycle): Agent <name> reviewed — X agreements, Y disagreements, Z new proposals. Next: <next-agent>.
 
 Then re-enter STATE 2 from step 2.1.
 
@@ -402,11 +408,11 @@ Then re-enter STATE 2 from step 2.1.
 
 - One agent dispatched and result collected
 - State file updated with reviews, counter-proposals, new proposals
-- Turn counter incremented
+- Cycle/dispatch counters updated
 - Consensus checked
 - Progress reported
 
-**GATE**: State file updated. Turn counter incremented. Consensus or max-turns checked.
+**GATE**: State file updated. Cycle/dispatch counters updated. Consensus or max-cycles checked.
 
 ---
 
@@ -416,8 +422,8 @@ Then re-enter STATE 2 from step 2.1.
 
 Read `.openspec/tmp/deliberate-state.json`. Extract:
 - `consensus_reached`
-- `turn` (total turns used)
-- `max_turns`
+- `current_cycle` (cycles used)
+- `max_cycles`
 - `current_proposals`
 - `rounds`
 - `agents`
@@ -442,9 +448,9 @@ Output the following to the user:
 ```
 ## Deliberation Results — <change-name>
 
-**Consensus**: <Reached after N turns | Not reached (hit max M turns)>
+**Consensus**: <Reached after N cycles | Not reached (hit max M cycles)>
 **Agents**: <agent1>, <agent2>, <agent3>
-**Turns used**: N / M
+**Cycles used**: N / M
 
 ### Agreed Proposals (X)
 
@@ -466,7 +472,7 @@ Output the following to the user:
 
 | Metric | Value |
 |--------|-------|
-| Total turns | N |
+| Total cycles | N |
 | Agreed proposals | X |
 | Disputed proposals | Y |
 | Agents participated | M |
@@ -559,8 +565,8 @@ Output the final summary:
 
 | Metric | Value |
 |--------|-------|
-| Consensus reached | Yes / No (hit max M turns) |
-| Total turns | N |
+| Consensus reached | Yes / No (hit max M cycles) |
+| Total cycles | N |
 | Agents | M |
 | Proposals applied | X |
 | Proposals disputed (skipped) | Y |
@@ -587,8 +593,8 @@ If rejected: "No changes were applied. The original artifacts are unchanged."
 - The orchestrator (primary agent) does NOT analyze artifacts — all analysis via subagents
 - State file at `.openspec/tmp/deliberate-state.json` is internal state — never show raw contents to user
 - Subagents run sequentially (not in parallel) — each sees the previous agent's results
-- Turn counter increments for every dispatch, including failed ones
+- Dispatch counter increments for every dispatch, including failed ones
 - Consensus requires one full cycle with zero disagreements AND zero new proposals from every agent
-- If max turns exceeded, present whatever state exists — do not fabricate consensus
+- If max cycles exceeded, present whatever state exists — do not fabricate consensus
 - User always has final say: accept, modify, or reject
-- Single commit after user acceptance (not per-turn commits)
+- Single commit after user acceptance (not per-dispatch commits)
