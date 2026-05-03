@@ -199,8 +199,10 @@ Ask each configuration question separately via `question` tool:
 **Question 1 — Max architecture deliberation cycles:**
 
 > "Max architecture deliberation cycles: **6** (default).
-> Each cycle = all architecture reviewers review once. More cycles = deeper consensus
-> on architectural directives but takes longer. Change or accept."
+> Each cycle = all architecture reviewers review once. Cycles repeat until every
+> reviewer agrees on all feedback with no new feedback added (consensus). If max
+> reached without consensus, directives proceed without it — human gate follows.
+> Higher values allow more opportunity for consensus but cost more tokens. Change or accept."
 
 **Question 2 — Max implementation attempts:**
 
